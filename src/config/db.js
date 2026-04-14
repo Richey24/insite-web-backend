@@ -12,7 +12,10 @@ const connectDB = async () => {
 
   while (retries > 0) {
     try {
-      await mongoose.connect(uri);
+      await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 10000,
+        tls: true,
+      });
       console.log('MongoDB connected successfully.');
       return;
     } catch (err) {

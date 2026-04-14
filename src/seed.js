@@ -21,7 +21,12 @@ const seed = async () => {
     process.exit(1);
   }
 
-  await mongoose.connect(process.env.MONGODB_URI);
+  await mongoose.connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    serverSelectionTimeoutMS: 10000,
+    tls: true,
+  });
   console.log('Connected to MongoDB.');
 
   const existing = await User.findOne({ email: SEED_USER.email });

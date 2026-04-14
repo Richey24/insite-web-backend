@@ -51,3 +51,30 @@ export const getMe = async (req, res) => {
 export const logout = async (req, res) => {
   res.json({ success: true, message: 'Logged out successfully.' });
 };
+
+// POST /api/auth/change-password  (protected)
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ success: false, error: 'Current and new password are required.' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ success: false, error: 'New password must be at least 8 characters.' });
+    }
+
+    const user = await User.findById(req.user._id).select('+passwordHash');
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ success: false, error: 'Current password is incorrect.' });
+    }
+
+    user.passwordHash = newPassword;
+    await user.save();
+
+    res.json({ success: true, message: 'Password changed successfully.' });
+  } catch (err) {
+    next(err);
+  }
+};
