@@ -10,6 +10,7 @@ import contactRoutes from './routes/contact.js';
 import newsletterRoutes from './routes/newsletter.js';
 import blogRoutes from './routes/blog.js';
 import authRoutes from './routes/auth.js';
+import uploadRoutes from './routes/upload.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/api/appointments', publicLimiter, appointmentRoutes);
 app.use('/api/contact', publicLimiter, contactRoutes);
 app.use('/api/newsletter', publicLimiter, newsletterRoutes);
 app.use('/api/blog', blogRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // ── Error Handling ──────────────────────────────────────────────────────────
 app.use(notFound);

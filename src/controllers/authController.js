@@ -78,3 +78,49 @@ export const changePassword = async (req, res, next) => {
     next(err);
   }
 };
+
+// GET /api/auth/users  (editor+)
+export const listUsers = async (req, res, next) => {
+  try {
+    const users = await User.find({})
+      .select('-passwordHash')
+      .sort({ createdAt: -1 })
+      .lean();
+    res.json({ success: true, data: users });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/auth/users  (admin only)
+export const createUser = async (req, res, next) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, error: 'name, email, and password are required.' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ success: false, error: 'Password must be at least 8 characters.' });
+    }
+
+    const VALID_ROLES = ['admin', 'editor', 'author'];
+    const assignedRole = VALID_ROLES.includes(role) ? role : 'author';
+
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.status(409).json({ success: false, error: 'A user with this email already exists.' });
+    }
+
+    const user = await User.create({
+      name,
+      email,
+      passwordHash: password, // pre-save hook will hash it
+      role: assignedRole,
+    });
+
+    res.status(201).json({ success: true, data: user.toJSON() });
+  } catch (err) {
+    next(err);
+  }
+};

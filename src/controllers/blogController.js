@@ -7,7 +7,9 @@ export const listPosts = async (req, res, next) => {
     const { status = 'published', category, tag, lang = 'en', page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const filter = { status };
+    const VALID_STATUSES = ['draft', 'published', 'archived'];
+    const filter = {};
+    if (VALID_STATUSES.includes(status)) filter.status = status;
     if (category) filter.categories = category;
 
     let posts = await BlogPost.find(filter)
@@ -65,13 +67,16 @@ export const createPost = async (req, res, next) => {
       return res.status(400).json({ success: false, error: 'slug and content.en.title are required.' });
     }
 
+    // Authors (writers) cannot publish — force to draft
+    const resolvedStatus = (status === 'published' && req.user.role === 'author') ? 'draft' : (status || 'draft');
+
     const post = await BlogPost.create({
       slug,
-      status: status || 'draft',
+      status: resolvedStatus,
       author: req.user._id,
       categories: categories || [],
       featuredImage: featuredImage || {},
-      publishedAt: status === 'published' ? (publishedAt || new Date()) : null,
+      publishedAt: resolvedStatus === 'published' ? (publishedAt || new Date()) : null,
       readTime: readTime || '',
       content,
     });
@@ -93,11 +98,17 @@ export const updatePost = async (req, res, next) => {
     const post = await BlogPost.findById(req.params.id);
     if (!post) return res.status(404).json({ success: false, error: 'Post not found.' });
 
-    // Only admin can change another author's post
+    // Only admin can change another author's post; editors can edit any post
     const isOwner = post.author.toString() === req.user._id.toString();
     const isAdmin = req.user.role === 'admin';
-    if (!isOwner && !isAdmin) {
+    const isEditor = req.user.role === 'editor';
+    if (!isOwner && !isAdmin && !isEditor) {
       return res.status(403).json({ success: false, error: 'Not authorized to edit this post.' });
+    }
+
+    // Authors (writers) cannot publish
+    if (status === 'published' && req.user.role === 'author') {
+      return res.status(403).json({ success: false, error: 'Writers cannot publish posts. Contact an editor.' });
     }
 
     if (slug) post.slug = slug;
