@@ -1,4 +1,5 @@
 import Newsletter from '../models/Newsletter.js';
+import { sendNewsletterConfirmation } from '../utils/email.js';
 
 // POST /api/newsletter/subscribe
 export const subscribe = async (req, res, next) => {
@@ -19,10 +20,12 @@ export const subscribe = async (req, res, next) => {
       existing.active = true;
       existing.unsubscribedAt = null;
       await existing.save();
+      sendNewsletterConfirmation(email).catch(() => {});
       return res.json({ success: true, message: 'Successfully re-subscribed.' });
     }
 
     const subscriber = await Newsletter.create({ email });
+    sendNewsletterConfirmation(email).catch(() => {});
     res.status(201).json({ success: true, data: { email: subscriber.email } });
   } catch (err) {
     next(err);

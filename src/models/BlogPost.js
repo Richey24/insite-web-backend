@@ -15,6 +15,17 @@ const langContentSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const commentSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true, lowercase: true },
+    website: { type: String, default: '' },
+    comment: { type: String, required: true },
+    status: { type: String, enum: ['pending', 'approved', 'spam'], default: 'pending' },
+  },
+  { timestamps: true }
+);
+
 const blogPostSchema = new mongoose.Schema(
   {
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -40,6 +51,7 @@ const blogPostSchema = new mongoose.Schema(
       de: { type: langContentSchema, default: () => ({}) },
       pt: { type: langContentSchema, default: () => ({}) },
     },
+    comments: { type: [commentSchema], default: [] },
   },
   { timestamps: true }
 );

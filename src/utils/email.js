@@ -118,3 +118,29 @@ export const sendContactConfirmation = async (contact) => {
     html: userHtml,
   });
 };
+
+// ── Newsletter Emails ─────────────────────────────────────────────────────────
+
+export const sendNewsletterConfirmation = async (email) => {
+  const transporter = createTransporter();
+  if (!transporter) return;
+
+  const html = `
+    <h2>You're subscribed!</h2>
+    <p>Thank you for subscribing to the InSite Health System newsletter.</p>
+    <p>You'll receive the latest healthcare technology insights, product updates, and industry news straight to your inbox.</p>
+    <p style="margin-top:16px">— The InSite Health System Team</p>
+    <hr style="margin-top:24px;border:none;border-top:1px solid #eee"/>
+    <p style="font-size:12px;color:#999">
+      If you did not subscribe, you can safely ignore this email. 
+      To unsubscribe, reply with "Unsubscribe" in the subject line.
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: FROM,
+    to: email,
+    subject: 'Welcome to InSite Health System Newsletter',
+    html,
+  });
+};

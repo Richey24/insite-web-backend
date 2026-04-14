@@ -132,3 +132,57 @@ export const deletePost = async (req, res, next) => {
     next(err);
   }
 };
+
+// GET /api/blog/posts/id/:id  (protected — for editor)
+export const getPostById = async (req, res, next) => {
+  try {
+    const post = await BlogPost.findById(req.params.id).populate('author', 'name slug avatar bio');
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found.' });
+    res.json({ success: true, data: post });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// POST /api/blog/posts/:slug/comments  (public)
+export const addComment = async (req, res, next) => {
+  try {
+    const { name, email, website, comment } = req.body;
+
+    if (!name || !email || !comment) {
+      return res.status(400).json({ success: false, error: 'name, email, and comment are required.' });
+    }
+
+    const post = await BlogPost.findOne({ slug: req.params.slug, status: 'published' });
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found.' });
+
+    post.comments.push({ name, email, website: website || '', comment, status: 'pending' });
+    await post.save();
+
+    res.status(201).json({ success: true, message: 'Comment submitted and awaiting moderation.' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET /api/blog/posts/:slug/comments  (public — approved only)
+export const getComments = async (req, res, next) => {
+  try {
+    const post = await BlogPost.findOne({ slug: req.params.slug, status: 'published' }, 'comments');
+    if (!post) return res.status(404).json({ success: false, error: 'Post not found.' });
+
+    const approved = post.comments
+      .filter((c) => c.status === 'approved')
+      .map((c) => ({
+        id: c._id,
+        name: c.name,
+        website: c.website,
+        comment: c.comment,
+        createdAt: c.createdAt,
+      }));
+
+    res.json({ success: true, data: approved });
+  } catch (err) {
+    next(err);
+  }
+};
