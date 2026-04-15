@@ -2,6 +2,7 @@ import express from 'express';
 import {
   listPosts,
   getStats,
+  getTags,
   getPostBySlug,
   getPostById,
   createPost,
@@ -16,6 +17,9 @@ const router = express.Router();
 
 // Stats — must be before /posts/:slug to avoid param collision
 router.get('/stats', protect, requireRole('editor'), getStats);
+
+// Tags — public
+router.get('/tags', getTags);
 
 // Public
 router.get('/posts', listPosts);

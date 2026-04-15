@@ -15,6 +15,22 @@ export const getStats = async (_req, res, next) => {
   }
 };
 
+// GET /api/blog/tags  — all unique English tags from published posts
+export const getTags = async (_req, res, next) => {
+  try {
+    const results = await BlogPost.aggregate([
+      { $match: { status: 'published' } },
+      { $unwind: '$content.en.tags' },
+      { $group: { _id: '$content.en.tags' } },
+      { $sort: { _id: 1 } },
+      { $project: { _id: 0, tag: '$_id' } },
+    ]);
+    res.json({ success: true, tags: results.map((r) => r.tag) });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/blog/posts
 // Query params: status, category, tag, lang, page, limit
 // status defaults to 'all' (no filter) so the management UI sees every post by default
