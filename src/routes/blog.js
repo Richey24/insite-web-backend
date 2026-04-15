@@ -1,6 +1,7 @@
 import express from 'express';
 import {
   listPosts,
+  getStats,
   getPostBySlug,
   getPostById,
   createPost,
@@ -12,6 +13,9 @@ import {
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Stats — must be before /posts/:slug to avoid param collision
+router.get('/stats', protect, requireRole('editor'), getStats);
 
 // Public
 router.get('/posts', listPosts);

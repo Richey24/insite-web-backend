@@ -1,10 +1,26 @@
 import BlogPost from '../models/BlogPost.js';
 
+// GET /api/blog/stats  (editor+)
+export const getStats = async (_req, res, next) => {
+  try {
+    const [total, published, drafts, archived] = await Promise.all([
+      BlogPost.countDocuments({}),
+      BlogPost.countDocuments({ status: 'published' }),
+      BlogPost.countDocuments({ status: 'draft' }),
+      BlogPost.countDocuments({ status: 'archived' }),
+    ]);
+    res.json({ success: true, data: { total, published, drafts, archived } });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // GET /api/blog/posts
 // Query params: status, category, tag, lang, page, limit
+// status defaults to 'all' (no filter) so the management UI sees every post by default
 export const listPosts = async (req, res, next) => {
   try {
-    const { status = 'published', category, tag, lang = 'en', page = 1, limit = 10 } = req.query;
+    const { status = 'all', category, tag, lang = 'en', page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
     const VALID_STATUSES = ['draft', 'published', 'archived'];
