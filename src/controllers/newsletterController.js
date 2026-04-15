@@ -20,12 +20,16 @@ export const subscribe = async (req, res, next) => {
       existing.active = true;
       existing.unsubscribedAt = null;
       await existing.save();
-      sendNewsletterConfirmation(email).catch(() => {});
+      sendNewsletterConfirmation(email).catch((err) =>
+        console.error('[Newsletter] Email send failed:', err.message)
+      );
       return res.json({ success: true, message: 'Successfully re-subscribed.' });
     }
 
     const subscriber = await Newsletter.create({ email });
-    sendNewsletterConfirmation(email).catch(() => {});
+    sendNewsletterConfirmation(email).catch((err) =>
+      console.error('[Newsletter] Email send failed:', err.message)
+    );
     res.status(201).json({ success: true, data: { email: subscriber.email } });
   } catch (err) {
     next(err);
