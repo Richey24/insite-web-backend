@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import { configureCloudinary } from './utils/cloudinary.js';
 import connectDB from './config/db.js';
 import appointmentRoutes from './routes/appointments.js';
 import contactRoutes from './routes/contact.js';
@@ -14,6 +15,7 @@ import uploadRoutes from './routes/upload.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 dotenv.config();
+configureCloudinary(); // Must run after dotenv.config() — env vars are now available
 
 // Connect to MongoDB
 connectDB();

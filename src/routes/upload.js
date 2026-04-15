@@ -1,22 +1,13 @@
 import express from 'express';
 import multer from 'multer';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import cloudinary from '../utils/cloudinary.js';
 import { protect, requireRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'insite-blog',
-    allowed_formats: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-    transformation: [{ width: 1200, crop: 'limit' }],
-  },
-});
-
+// Store file in memory so we can stream it to Cloudinary
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) return cb(null, true);
@@ -30,19 +21,40 @@ router.post(
   protect,
   requireRole('author'),
   upload.single('image'),
-  (req, res) => {
+  async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, error: 'No image file provided.' });
     }
-    res.json({
-      success: true,
-      url: req.file.path,           // Cloudinary secure URL
-      publicId: req.file.filename,  // Cloudinary public_id
-    });
+
+    try {
+      // Stream the buffer to Cloudinary
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'insite-blog',
+            transformation: [{ width: 1200, crop: 'limit' }],
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+
+      res.json({
+        success: true,
+        url: result.secure_url,
+        publicId: result.public_id,
+      });
+    } catch (err) {
+      console.error('[upload] Cloudinary error:', err);
+      res.status(500).json({ success: false, error: err.message || 'Upload failed.' });
+    }
   }
 );
 
-// Multer/Cloudinary error handler for this router
+// Multer error handler for this router
 router.use((err, _req, res, _next) => {
   res.status(400).json({ success: false, error: err.message || 'Upload failed.' });
 });
