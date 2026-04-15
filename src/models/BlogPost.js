@@ -56,8 +56,7 @@ const blogPostSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for fast slug lookup and filtered queries
-blogPostSchema.index({ slug: 1 });
+// Indexes for fast filtered queries (slug index is implicit from unique:true above)
 blogPostSchema.index({ status: 1, publishedAt: -1 });
 blogPostSchema.index({ categories: 1 });
 
