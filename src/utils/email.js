@@ -252,6 +252,106 @@ export const sendContactConfirmation = async (contact) => {
   });
 };
 
+// ── Calendly Webhook Emails ───────────────────────────────────────────────────
+
+export const sendCalendlyBookingAlert = async (event) => {
+  const transporter = createTransporter();
+  if (!transporter) return;
+
+  const {
+    eventName, eventType, startTime, endTime,
+    location, inviteeName, inviteeEmail,
+    cancelUrl, rescheduleUrl, questions,
+  } = event;
+
+  const fmt = (d) =>
+    d
+      ? d.toLocaleString('en-US', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+        })
+      : 'TBD';
+
+  const questionsHtml = questions?.length
+    ? `${divider()}
+       <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;">Invitee Responses</p>
+       ${infoTable(questions.map((q) => [q.question, q.answer || '—']))}`
+    : '';
+
+  const adminBody = `
+    ${h1('New Calendly Booking')}
+    ${p('Someone just scheduled a meeting via Calendly.')}
+    ${badge('New Booking', '#18c8ff')}
+    ${infoTable([
+      ['Invitee',     `${inviteeName} &lt;<a href="mailto:${inviteeEmail}" style="color:#083791;">${inviteeEmail}</a>&gt;`],
+      ['Event',       eventName || eventType],
+      ['Start',       fmt(startTime)],
+      ['End',         fmt(endTime)],
+      ['Location',    location],
+    ])}
+    ${questionsHtml}
+    ${divider()}
+    <table cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+      <tr>
+        ${cancelUrl    ? `<td style="padding-right:12px;"><a href="${cancelUrl}" style="display:inline-block;background:#ef44440d;color:#ef4444;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none;border:1px solid #ef444433;">Cancel Event</a></td>` : ''}
+        ${rescheduleUrl ? `<td><a href="${rescheduleUrl}" style="display:inline-block;background:#083791;color:#ffffff;font-size:13px;font-weight:600;padding:10px 20px;border-radius:8px;text-decoration:none;">Reschedule</a></td>` : ''}
+      </tr>
+    </table>
+    ${p(`Reply directly to this email to contact ${inviteeName}.`, 'font-size:13px;color:#9ca3af;')}
+  `;
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      ADMIN_NOTIFICATION_EMAILS.join(', '),
+    replyTo: inviteeEmail,
+    subject: `📅 New Booking: ${inviteeName} — ${fmt(startTime)}`,
+    html:    layout(adminBody),
+  });
+};
+
+export const sendCalendlyCancellationAlert = async (event) => {
+  const transporter = createTransporter();
+  if (!transporter) return;
+
+  const {
+    eventName, startTime,
+    inviteeName, inviteeEmail,
+    cancelReason, canceledBy,
+  } = event;
+
+  const fmt = (d) =>
+    d
+      ? d.toLocaleString('en-US', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          hour: '2-digit', minute: '2-digit', timeZoneName: 'short',
+        })
+      : 'TBD';
+
+  const adminBody = `
+    ${h1('Calendly Booking Cancelled')}
+    ${p('A previously scheduled meeting has been cancelled.')}
+    ${badge('Cancelled', '#ef4444')}
+    ${infoTable([
+      ['Invitee',      `${inviteeName} &lt;<a href="mailto:${inviteeEmail}" style="color:#083791;">${inviteeEmail}</a>&gt;`],
+      ['Event',        eventName],
+      ['Was Scheduled', fmt(startTime)],
+      ['Cancelled By', canceledBy || '—'],
+      ['Reason',       cancelReason || 'No reason provided'],
+    ])}
+    ${divider()}
+    ${alertBox(`This time slot is now <strong>available again</strong> on your calendar.`, '#18c8ff')}
+    ${p(`You may want to follow up with ${inviteeName} to reschedule.`, 'font-size:13px;color:#9ca3af;')}
+  `;
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      ADMIN_NOTIFICATION_EMAILS.join(', '),
+    replyTo: inviteeEmail,
+    subject: `❌ Booking Cancelled: ${inviteeName} — ${fmt(startTime)}`,
+    html:    layout(adminBody),
+  });
+};
+
 // ── Newsletter Emails ─────────────────────────────────────────────────────────
 
 export const sendNewsletterConfirmation = async (subscriberEmail) => {

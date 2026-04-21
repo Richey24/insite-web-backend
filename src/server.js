@@ -12,6 +12,7 @@ import newsletterRoutes from './routes/newsletter.js';
 import blogRoutes from './routes/blog.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
+import calendlyRoutes from './routes/calendly.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 dotenv.config();
@@ -33,6 +34,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
+
+// ── Calendly Webhook (raw body — must come BEFORE express.json()) ─────────────
+// The route itself applies express.raw() so the HMAC signature can be verified.
+app.use('/api/calendly', calendlyRoutes);
 
 // ── Body Parsing ────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
