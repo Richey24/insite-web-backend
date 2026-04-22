@@ -31,7 +31,7 @@ const blogPostSchema = new mongoose.Schema(
     slug: { type: String, required: true, unique: true, lowercase: true, trim: true },
     status: {
       type: String,
-      enum: ['draft', 'published', 'archived'],
+      enum: ['draft', 'published', 'scheduled', 'archived'],
       default: 'draft',
     },
     author: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -40,7 +40,8 @@ const blogPostSchema = new mongoose.Schema(
       url: { type: String, default: '' },
       altText: { type: String, default: '' },
     },
-    publishedAt: { type: Date, default: null },
+    publishedAt:  { type: Date, default: null }, // when the post actually went live (set by system)
+    scheduledAt:  { type: Date, default: null }, // when the editor intends the post to go live
     views: { type: Number, default: 0 },
     readTime: { type: String, default: '' },
     content: {
@@ -58,6 +59,7 @@ const blogPostSchema = new mongoose.Schema(
 
 // Indexes for fast filtered queries (slug index is implicit from unique:true above)
 blogPostSchema.index({ status: 1, publishedAt: -1 });
+blogPostSchema.index({ status: 1, scheduledAt: 1 }); // for the cron job query
 blogPostSchema.index({ categories: 1 });
 
 const BlogPost = mongoose.model('BlogPost', blogPostSchema);

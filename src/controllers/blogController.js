@@ -3,13 +3,14 @@ import BlogPost from '../models/BlogPost.js';
 // GET /api/blog/stats  (editor+)
 export const getStats = async (_req, res, next) => {
   try {
-    const [total, published, drafts, archived] = await Promise.all([
+    const [total, published, drafts, scheduled, archived] = await Promise.all([
       BlogPost.countDocuments({}),
       BlogPost.countDocuments({ status: 'published' }),
       BlogPost.countDocuments({ status: 'draft' }),
+      BlogPost.countDocuments({ status: 'scheduled' }),
       BlogPost.countDocuments({ status: 'archived' }),
     ]);
-    res.json({ success: true, data: { total, published, drafts, archived } });
+    res.json({ success: true, data: { total, published, drafts, scheduled, archived } });
   } catch (err) {
     next(err);
   }
@@ -39,7 +40,7 @@ export const listPosts = async (req, res, next) => {
     const { status = 'all', category, tag, lang = 'en', page = 1, limit = 10 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const VALID_STATUSES = ['draft', 'published', 'archived'];
+    const VALID_STATUSES = ['draft', 'published', 'scheduled', 'archived'];
     const filter = {};
     if (VALID_STATUSES.includes(status)) filter.status = status;
     if (category) filter.categories = category;
@@ -93,23 +94,37 @@ export const getPostBySlug = async (req, res, next) => {
 // POST /api/blog/posts  (author+)
 export const createPost = async (req, res, next) => {
   try {
-    const { slug, status, categories, featuredImage, publishedAt, readTime, content } = req.body;
+    const { slug, status, categories, featuredImage, scheduledAt, readTime, content } = req.body;
 
     if (!slug || !content?.en?.title) {
       return res.status(400).json({ success: false, error: 'slug and content.en.title are required.' });
     }
 
-    // Authors (writers) cannot publish — force to draft
-    const resolvedStatus = (status === 'published' && req.user.role === 'author') ? 'draft' : (status || 'draft');
+    // Authors cannot publish or schedule — force to draft
+    const isAuthorOnly = req.user.role === 'author';
+    const resolvedStatus =
+      isAuthorOnly && (status === 'published' || status === 'scheduled')
+        ? 'draft'
+        : (status || 'draft');
+
+    // Validate: scheduled posts must have a future scheduledAt date
+    if (resolvedStatus === 'scheduled') {
+      if (!scheduledAt || new Date(scheduledAt) <= new Date()) {
+        return res.status(400).json({ success: false, error: 'Scheduled posts must have a future scheduledAt date.' });
+      }
+    }
 
     const post = await BlogPost.create({
       slug,
-      status: resolvedStatus,
-      author: req.user._id,
-      categories: categories || [],
+      status:      resolvedStatus,
+      author:      req.user._id,
+      categories:  categories || [],
       featuredImage: featuredImage || {},
-      publishedAt: resolvedStatus === 'published' ? (publishedAt || new Date()) : null,
-      readTime: readTime || '',
+      // scheduledAt: editor's intended publish time (only for scheduled posts)
+      scheduledAt: resolvedStatus === 'scheduled' ? new Date(scheduledAt) : null,
+      // publishedAt: actual publish time (set now for immediate publishes; cron sets it for scheduled)
+      publishedAt: resolvedStatus === 'published' ? new Date() : null,
+      readTime:    readTime || '',
       content,
     });
 
@@ -125,35 +140,63 @@ export const createPost = async (req, res, next) => {
 // PUT /api/blog/posts/:id  (author+)
 export const updatePost = async (req, res, next) => {
   try {
-    const { slug, status, categories, featuredImage, publishedAt, readTime, content } = req.body;
+    const { slug, status, categories, featuredImage, scheduledAt, readTime, content } = req.body;
 
     const post = await BlogPost.findById(req.params.id);
     if (!post) return res.status(404).json({ success: false, error: 'Post not found.' });
 
     // Only admin can change another author's post; editors can edit any post
-    const isOwner = post.author.toString() === req.user._id.toString();
-    const isAdmin = req.user.role === 'admin';
+    const isOwner  = post.author.toString() === req.user._id.toString();
+    const isAdmin  = req.user.role === 'admin';
     const isEditor = req.user.role === 'editor';
     if (!isOwner && !isAdmin && !isEditor) {
       return res.status(403).json({ success: false, error: 'Not authorized to edit this post.' });
     }
 
-    // Authors (writers) cannot publish
-    if (status === 'published' && req.user.role === 'author') {
-      return res.status(403).json({ success: false, error: 'Writers cannot publish posts. Contact an editor.' });
+    // Authors cannot publish or schedule
+    const isAuthorOnly = req.user.role === 'author';
+    if (isAuthorOnly && (status === 'published' || status === 'scheduled')) {
+      return res.status(403).json({ success: false, error: 'Writers cannot publish or schedule posts. Contact an editor.' });
+    }
+
+    // Validate: scheduled posts must have a future scheduledAt date
+    if (status === 'scheduled') {
+      if (!scheduledAt || new Date(scheduledAt) <= new Date()) {
+        return res.status(400).json({ success: false, error: 'Scheduled posts must have a future scheduledAt date.' });
+      }
     }
 
     if (slug) post.slug = slug;
+
     if (status) {
-      if (status === 'published' && post.status !== 'published') {
-        post.publishedAt = publishedAt || new Date();
-      }
+      const prevStatus = post.status;
       post.status = status;
+
+      if (status === 'published' && prevStatus !== 'published') {
+        // Immediately published — stamp actual publish time now
+        post.publishedAt = new Date();
+        post.scheduledAt = null;
+      } else if (status === 'scheduled') {
+        // Store editor's intended time; cron will set publishedAt when it fires
+        post.scheduledAt = new Date(scheduledAt);
+        post.publishedAt = null;
+      } else if (status === 'draft' || status === 'archived') {
+        // Unscheduled or unpublished — clear both dates
+        post.scheduledAt = null;
+        if (status === 'draft') post.publishedAt = null;
+      }
+    } else if (status === undefined && scheduledAt && post.status === 'scheduled') {
+      // Allow updating just the scheduled date without changing status
+      if (new Date(scheduledAt) <= new Date()) {
+        return res.status(400).json({ success: false, error: 'scheduledAt must be a future date.' });
+      }
+      post.scheduledAt = new Date(scheduledAt);
     }
-    if (categories) post.categories = categories;
+
+    if (categories)    post.categories    = categories;
     if (featuredImage) post.featuredImage = featuredImage;
-    if (readTime) post.readTime = readTime;
-    if (content) post.content = { ...post.content, ...content };
+    if (readTime)      post.readTime      = readTime;
+    if (content)       post.content       = { ...post.content, ...content };
 
     await post.save();
     res.json({ success: true, data: post });

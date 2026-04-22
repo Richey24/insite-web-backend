@@ -14,6 +14,7 @@ import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import calendlyRoutes from './routes/calendly.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { startScheduler } from './utils/scheduler.js';
 
 dotenv.config();
 configureCloudinary(); // Must run after dotenv.config() — env vars are now available
@@ -73,6 +74,7 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   console.log(`InSite API running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  startScheduler();
 });
 
 export default app;
